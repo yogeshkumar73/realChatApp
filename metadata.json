@@ -1,0 +1,8 @@
+{
+  "name": "Real-time Chat & Call App",
+  "description": "A real-time chat application with voice and video calling features built with Node.js, Express, Socket.io, WebRTC, and React. ",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
