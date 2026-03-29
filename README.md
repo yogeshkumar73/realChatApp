@@ -6,7 +6,7 @@
 
 This contains everything you need to run your app locally.
 
-View your app in AI Studio: https://ai.studio/apps/5e214398-4847-47fc-8d23-89936ca56ddc
+
 
 ## Run Locally
 
@@ -18,3 +18,4 @@ View your app in AI Studio: https://ai.studio/apps/5e214398-4847-47fc-8d23-89936
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
+//git remote add origin https://github.com/indbrother80050-create/RealChat.git
