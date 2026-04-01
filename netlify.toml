@@ -1,8 +1,8 @@
 [build]
-  # Command to build your app
+ 
   command = "npm run build"
-  # Directory to deploy
-  publish = "build"
+ 
+  publish = "dist"
 
 # Redirect all routes to index.html for SPA routing
 [[redirects]]
