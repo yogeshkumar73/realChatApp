@@ -555,7 +555,7 @@ class AppServer {
   }
 
   public async start() {
-    const PORT = 3000;
+    const PORT = 3000||process.env.PORT;
     
     if (process.env.NODE_ENV !== 'production') {
       const vite = await createViteServer({
