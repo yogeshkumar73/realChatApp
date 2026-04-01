@@ -270,7 +270,7 @@ class AppServer {
   };
 
   private setupRoutes() {
-    this.app.post('/api/auth/register', (req, res) => {
+    this.app.post('https://illustrious-pony-fb2b02.netlify.app/register/api/auth/register', (req, res) => {
       const { username, password } = req.body;
       if (!username || !password) return res.status(400).json({ error: 'Missing fields' });
 
@@ -306,12 +306,12 @@ class AppServer {
       res.json({ token, user: { id: user.id, username: user.username, profile_name: user.profile_name, bio: user.bio, avatar: user.avatar, is_profile_complete: user.is_profile_complete, role: user.role, is_suspended: user.is_suspended } });
     });
 
-    this.app.get('/api/auth/me', this.authenticateToken, (req: any, res) => {
+    this.app.get('https://illustrious-pony-fb2b02.netlify.app/register/api/auth/me', this.authenticateToken, (req: any, res) => {
       const user = db.prepare('SELECT id, username, profile_name, bio, avatar, is_profile_complete, role, is_suspended FROM users WHERE id = ?').get(req.user.id);
       res.json({ user });
     });
 
-    this.app.post('/api/profile', this.authenticateToken, (req: any, res) => {
+    this.app.post('https://illustrious-pony-fb2b02.netlify.app/register/api/profile', this.authenticateToken, (req: any, res) => {
       const { profile_name, bio, avatar } = req.body;
       db.prepare(`
         UPDATE users SET profile_name = ?, bio = ?, avatar = ?, is_profile_complete = 1 WHERE id = ?
@@ -338,7 +338,7 @@ class AppServer {
       res.json(usersWithStatus);
     });
 
-    this.app.post('/api/connections/request', this.authenticateToken, (req: any, res) => {
+    this.app.post('https://illustrious-pony-fb2b02.netlify.app/register/api/connections/request', this.authenticateToken, (req: any, res) => {
       const { receiverId } = req.body;
       try {
         db.prepare('INSERT INTO connections (id, sender_id, receiver_id, status) VALUES (?, ?, ?, ?)')
@@ -364,12 +364,12 @@ class AppServer {
     });
 
     // Admin Routes
-    this.app.get('/api/admin/users', this.authenticateToken, this.requireAdmin, (req: any, res) => {
+    this.app.get('https://illustrious-pony-fb2b02.netlify.app/register/api/admin/users', this.authenticateToken, this.requireAdmin, (req: any, res) => {
       const users = db.prepare('SELECT id, username, profile_name, role, is_suspended, is_profile_complete FROM users').all();
       res.json(users);
     });
 
-    this.app.post('/api/admin/users/:id/suspend', this.authenticateToken, this.requireAdmin, (req: any, res) => {
+    this.app.post('https://illustrious-pony-fb2b02.netlify.app/register/api/admin/users/:id/suspend', this.authenticateToken, this.requireAdmin, (req: any, res) => {
       const userToSuspend = db.prepare('SELECT username FROM users WHERE id = ?').get(req.params.id) as any;
       if (userToSuspend && userToSuspend.username === SUPER_ADMIN_USERNAME) {
         return res.status(403).json({ error: 'Safety Feature: Cannot suspend the super admin.' });
@@ -387,12 +387,12 @@ class AppServer {
       res.json({ success: true });
     });
 
-    this.app.post('/api/admin/users/:id/activate', this.authenticateToken, this.requireAdmin, (req: any, res) => {
+    this.app.post('https://illustrious-pony-fb2b02.netlify.app/register/api/admin/users/:id/activate', this.authenticateToken, this.requireAdmin, (req: any, res) => {
       db.prepare('UPDATE users SET is_suspended = 0 WHERE id = ?').run(req.params.id);
       res.json({ success: true });
     });
 
-    this.app.delete('/api/admin/users/:id', this.authenticateToken, this.requireAdmin, (req: any, res) => {
+    this.app.delete('https://illustrious-pony-fb2b02.netlify.app/register/api/admin/users/:id', this.authenticateToken, this.requireAdmin, (req: any, res) => {
       const userId = req.params.id;
       const userToDelete = db.prepare('SELECT username FROM users WHERE id = ?').get(userId) as any;
       if (userToDelete && userToDelete.username === SUPER_ADMIN_USERNAME) {
@@ -421,7 +421,7 @@ class AppServer {
     });
 
     // Support Tickets Routes
-    this.app.post('/api/tickets', this.authenticateToken, (req: any, res) => {
+    this.app.post('https://illustrious-pony-fb2b02.netlify.app/register/api/tickets', this.authenticateToken, (req: any, res) => {
       const { subject, message } = req.body;
       if (!subject || !message) return res.status(400).json({ error: 'Missing fields' });
       const id = crypto.randomUUID();
@@ -445,13 +445,13 @@ class AppServer {
       }
     });
 
-    this.app.post('/api/admin/tickets/:id/resolve', this.authenticateToken, this.requireAdmin, (req: any, res) => {
+    this.app.post('https://illustrious-pony-fb2b02.netlify.app/register/api/admin/tickets/:id/resolve', this.authenticateToken, this.requireAdmin, (req: any, res) => {
       db.prepare("UPDATE support_tickets SET status = 'resolved' WHERE id = ?").run(req.params.id);
       res.json({ success: true });
     });
 
     // Chatrooms Routes
-    this.app.post('/api/chatrooms', this.authenticateToken, (req: any, res) => {
+    this.app.post('https://illustrious-pony-fb2b02.netlify.app/register/api/chatrooms', this.authenticateToken, (req: any, res) => {
       const { name } = req.body;
       if (!name) return res.status(400).json({ error: 'Missing room name' });
 
@@ -472,7 +472,7 @@ class AppServer {
       }
     });
 
-    this.app.post('/api/chatrooms/join', this.authenticateToken, (req: any, res) => {
+    this.app.post('https://illustrious-pony-fb2b02.netlify.app/register/api/chatrooms/join', this.authenticateToken, (req: any, res) => {
       const { code } = req.body;
       if (!code) return res.status(400).json({ error: 'Missing room code' });
 
@@ -492,7 +492,7 @@ class AppServer {
       }
     });
 
-    this.app.get('/api/chatrooms', this.authenticateToken, (req: any, res) => {
+    this.app.get('https://illustrious-pony-fb2b02.netlify.app/register/api/chatrooms', this.authenticateToken, (req: any, res) => {
       if (req.user.role === 'admin') {
         const rooms = db.prepare('SELECT * FROM chatrooms ORDER BY created_at DESC').all();
         res.json(rooms);
@@ -508,7 +508,7 @@ class AppServer {
       }
     });
 
-    this.app.get('/api/chatrooms/:id/messages', this.authenticateToken, (req: any, res) => {
+    this.app.get('https://illustrious-pony-fb2b02.netlify.app/register/api/chatrooms/:id/messages', this.authenticateToken, (req: any, res) => {
       const roomId = req.params.id;
       // Check if user is a member
       const member = db.prepare('SELECT * FROM chatroom_members WHERE chatroom_id = ? AND user_id = ?')
@@ -527,7 +527,7 @@ class AppServer {
       res.json(messages);
     });
 
-    this.app.get('/api/chatrooms/:id/members', this.authenticateToken, (req: any, res) => {
+    this.app.get('https://illustrious-pony-fb2b02.netlify.app/register/api/chatrooms/:id/members', this.authenticateToken, (req: any, res) => {
       const roomId = req.params.id;
       const members = db.prepare(`
         SELECT u.id, u.username, u.profile_name, u.avatar
@@ -538,7 +538,7 @@ class AppServer {
       res.json(members);
     });
 
-    this.app.put('/api/chatrooms/:id/settings', this.authenticateToken, (req: any, res) => {
+    this.app.put('https://illustrious-pony-fb2b02.netlify.app/register/api/chatrooms/:id/settings', this.authenticateToken, (req: any, res) => {
       const { name, music_url } = req.body;
       const roomId = req.params.id;
 
@@ -555,7 +555,7 @@ class AppServer {
   }
 
   public async start() {
-    const PORT = 3000;
+    const PORT = process.env.PORT||3000;
 
     if (process.env.NODE_ENV !== 'production') {
       const vite = await createViteServer({
