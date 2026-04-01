@@ -81,10 +81,10 @@ db.exec(`
 `);
 
 // Add new columns if they don't exist (for existing databases)
-try { db.exec("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'"); } catch (e) {}
-try { db.exec("ALTER TABLE users ADD COLUMN is_suspended BOOLEAN DEFAULT 0"); } catch (e) {}
-try { db.exec("ALTER TABLE chatroom_messages ADD COLUMN image_url TEXT"); } catch (e) {}
-try { db.exec("ALTER TABLE chatrooms ADD COLUMN music_url TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'"); } catch (e) { }
+try { db.exec("ALTER TABLE users ADD COLUMN is_suspended BOOLEAN DEFAULT 0"); } catch (e) { }
+try { db.exec("ALTER TABLE chatroom_messages ADD COLUMN image_url TEXT"); } catch (e) { }
+try { db.exec("ALTER TABLE chatrooms ADD COLUMN music_url TEXT"); } catch (e) { }
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key-change-in-prod';
 
@@ -125,12 +125,12 @@ class AppServer {
       }
       jwt.verify(token, JWT_SECRET, (err: any, decoded: any) => {
         if (err) return next(new Error('Authentication error'));
-        
+
         const user = db.prepare('SELECT is_suspended FROM users WHERE id = ?').get(decoded.id) as any;
         if (!user || user.is_suspended) {
           return next(new Error('Account suspended'));
         }
-        
+
         socket.data.user = decoded;
         next();
       });
@@ -139,12 +139,12 @@ class AppServer {
     this.io.on('connection', (socket) => {
       const currentUserId = socket.data.user.id;
       this.userSockets.set(currentUserId, socket.id);
-      
+
       const connections = db.prepare(`
         SELECT sender_id, receiver_id FROM connections 
         WHERE status = 'accepted' AND (sender_id = ? OR receiver_id = ?)
       `).all(currentUserId, currentUserId) as any[];
-      
+
       connections.forEach(conn => {
         const friendId = conn.sender_id === currentUserId ? conn.receiver_id : conn.sender_id;
         const friendSocketId = this.userSockets.get(friendId);
@@ -162,7 +162,7 @@ class AppServer {
           text: data.text,
           timestamp: new Date().toISOString(),
         };
-        
+
         if (receiverSocketId) {
           this.io.to(receiverSocketId).emit('receive_message', message);
         }
@@ -208,13 +208,13 @@ class AppServer {
           image_url: data.image_url || null,
           created_at: new Date().toISOString(),
         };
-        
+
         try {
           db.prepare('INSERT INTO chatroom_messages (id, chatroom_id, sender_id, content, image_url, created_at) VALUES (?, ?, ?, ?, ?, ?)')
             .run(message.id, message.chatroom_id, message.sender_id, message.content, message.image_url, message.created_at);
-          
+
           const sender = db.prepare('SELECT username, profile_name, avatar FROM users WHERE id = ?').get(currentUserId) as any;
-          
+
           this.io.to(data.roomId).emit('receive_room_message', {
             ...message,
             username: sender.username,
@@ -232,7 +232,7 @@ class AppServer {
           SELECT sender_id, receiver_id FROM connections 
           WHERE status = 'accepted' AND (sender_id = ? OR receiver_id = ?)
         `).all(currentUserId, currentUserId) as any[];
-        
+
         connections.forEach(conn => {
           const friendId = conn.sender_id === currentUserId ? conn.receiver_id : conn.sender_id;
           const friendSocketId = this.userSockets.get(friendId);
@@ -251,12 +251,12 @@ class AppServer {
 
     jwt.verify(token, JWT_SECRET, (err: any, decoded: any) => {
       if (err) return res.sendStatus(403);
-      
+
       // Check if user is suspended
       const user = db.prepare('SELECT * FROM users WHERE id = ?').get(decoded.id) as any;
       if (!user) return res.sendStatus(404);
       if (user.is_suspended) return res.status(403).json({ error: 'Account suspended' });
-      
+
       req.user = user;
       next();
     });
@@ -280,7 +280,7 @@ class AppServer {
         // First user is admin, or username 'admin' is admin
         const isFirstUser = (db.prepare('SELECT COUNT(*) as count FROM users').get() as any).count === 0;
         const role = (isFirstUser || username === 'admin') ? 'admin' : 'user';
-        
+
         db.prepare('INSERT INTO users (id, username, password, role) VALUES (?, ?, ?, ?)').run(id, username, hashedPassword, role);
         const token = jwt.sign({ id, username }, JWT_SECRET);
         res.json({ token, user: { id, username, is_profile_complete: 0, role, is_suspended: 0 } });
@@ -329,12 +329,12 @@ class AppServer {
           (c.receiver_id = u.id AND c.sender_id = ?)
         WHERE u.id != ? AND u.is_profile_complete = 1
       `).all(req.user.id, req.user.id, req.user.id);
-      
+
       const usersWithStatus = users.map((u: any) => ({
         ...u,
         isOnline: this.userSockets.has(u.id)
       }));
-      
+
       res.json(usersWithStatus);
     });
 
@@ -376,14 +376,14 @@ class AppServer {
       }
 
       db.prepare('UPDATE users SET is_suspended = 1 WHERE id = ?').run(req.params.id);
-      
+
       // Disconnect user if online
       const socketId = this.userSockets.get(req.params.id);
       if (socketId) {
         this.io.to(socketId).emit('force_logout');
         this.io.sockets.sockets.get(socketId)?.disconnect(true);
       }
-      
+
       res.json({ success: true });
     });
 
@@ -398,7 +398,7 @@ class AppServer {
       if (userToDelete && userToDelete.username === SUPER_ADMIN_USERNAME) {
         return res.status(403).json({ error: 'Safety Feature: Cannot delete the super admin.' });
       }
-      
+
       db.transaction(() => {
         db.prepare('DELETE FROM messages WHERE sender_id = ? OR receiver_id = ?').run(userId, userId);
         db.prepare('DELETE FROM connections WHERE sender_id = ? OR receiver_id = ?').run(userId, userId);
@@ -454,11 +454,11 @@ class AppServer {
     this.app.post('/api/chatrooms', this.authenticateToken, (req: any, res) => {
       const { name } = req.body;
       if (!name) return res.status(400).json({ error: 'Missing room name' });
-      
+
       const roomId = crypto.randomUUID();
       // Generate a simple 6-character code
       const code = crypto.randomBytes(3).toString('hex').toUpperCase();
-      
+
       try {
         db.transaction(() => {
           db.prepare('INSERT INTO chatrooms (id, name, code, created_by) VALUES (?, ?, ?, ?)')
@@ -475,10 +475,10 @@ class AppServer {
     this.app.post('/api/chatrooms/join', this.authenticateToken, (req: any, res) => {
       const { code } = req.body;
       if (!code) return res.status(400).json({ error: 'Missing room code' });
-      
+
       const room = db.prepare('SELECT * FROM chatrooms WHERE code = ?').get(code.toUpperCase()) as any;
       if (!room) return res.status(404).json({ error: 'Room not found' });
-      
+
       try {
         db.prepare('INSERT INTO chatroom_members (chatroom_id, user_id) VALUES (?, ?)')
           .run(room.id, req.user.id);
@@ -513,9 +513,9 @@ class AppServer {
       // Check if user is a member
       const member = db.prepare('SELECT * FROM chatroom_members WHERE chatroom_id = ? AND user_id = ?')
         .get(roomId, req.user.id);
-      
+
       if (!member && req.user.role !== 'admin') return res.status(403).json({ error: 'Not a member of this room' });
-      
+
       const messages = db.prepare(`
         SELECT m.*, u.username, u.profile_name, u.avatar 
         FROM chatroom_messages m
@@ -523,7 +523,7 @@ class AppServer {
         WHERE m.chatroom_id = ?
         ORDER BY m.created_at ASC
       `).all(roomId);
-      
+
       res.json(messages);
     });
 
@@ -541,22 +541,22 @@ class AppServer {
     this.app.put('/api/chatrooms/:id/settings', this.authenticateToken, (req: any, res) => {
       const { name, music_url } = req.body;
       const roomId = req.params.id;
-      
+
       const room = db.prepare('SELECT * FROM chatrooms WHERE id = ?').get(roomId) as any;
       if (!room || room.created_by !== req.user.id) {
         return res.status(403).json({ error: 'Unauthorized to modify this room' });
       }
-      
+
       db.prepare('UPDATE chatrooms SET name = ?, music_url = ? WHERE id = ?').run(name, music_url, roomId);
-      
+
       this.io.to(roomId).emit('room_updated', { id: roomId, name, music_url });
       res.json({ success: true });
     });
   }
 
   public async start() {
-    const PORT = 3000||process.env.PORT;
-    
+    const PORT = 3000;
+
     if (process.env.NODE_ENV !== 'production') {
       const vite = await createViteServer({
         server: { middlewareMode: true },
