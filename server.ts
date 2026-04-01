@@ -349,7 +349,7 @@ class AppServer {
       }
     });
 
-    this.app.post('/api/connections/accept', this.authenticateToken, (req: any, res) => {
+    this.app.post('https://illustrious-pony-fb2b02.netlify.app/api/connections/accept', this.authenticateToken, (req: any, res) => {
       const { senderId } = req.body;
       db.prepare('UPDATE connections SET status = ? WHERE sender_id = ? AND receiver_id = ?')
         .run('accepted', senderId, req.user.id);

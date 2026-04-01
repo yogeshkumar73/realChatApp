@@ -73,7 +73,7 @@ export default function Dashboard() {
   const [activeChat, setActiveChat] = useState<AppUser | null>(null);
   const [messages, setMessages] = useState<Record<string, Message[]>>({});
   const [inputText, setInputText] = useState('');
-  
+
   // New State
   const [activeTab, setActiveTab] = useState<'chat' | 'rooms' | 'help' | 'admin'>('chat');
   const [chatrooms, setChatrooms] = useState<Chatroom[]>([]);
@@ -84,7 +84,7 @@ export default function Dashboard() {
   const [joinRoomCode, setJoinRoomCode] = useState('');
   const [ticketSubject, setTicketSubject] = useState('');
   const [ticketMessage, setTicketMessage] = useState('');
-  
+
   // Room specific state
   const [roomMembers, setRoomMembers] = useState<RoomMember[]>([]);
   const [showRoomSettings, setShowRoomSettings] = useState(false);
@@ -92,7 +92,7 @@ export default function Dashboard() {
   const [editMusicUrl, setEditMusicUrl] = useState('');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   // WebRTC State
   const [receivingCall, setReceivingCall] = useState(false);
   const [caller, setCaller] = useState('');
@@ -101,7 +101,7 @@ export default function Dashboard() {
   const [callEnded, setCallEnded] = useState(false);
   const [callType, setCallType] = useState<'video' | 'voice'>('video');
   const [stream, setStream] = useState<MediaStream | null>(null);
-  
+
   const myVideo = useRef<HTMLVideoElement>(null);
   const userVideo = useRef<HTMLVideoElement>(null);
   const connectionRef = useRef<RTCPeerConnection | null>(null);
@@ -124,7 +124,7 @@ export default function Dashboard() {
 
   const fetchAllUsers = React.useCallback(async () => {
     try {
-      const res = await fetch('/api/admin/users', {
+      const res = await fetch('https://illustrious-pony-fb2b02.netlify.app/api/admin/users', {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
@@ -152,7 +152,7 @@ export default function Dashboard() {
 
   const fetchTickets = React.useCallback(async () => {
     try {
-      const res = await fetch('/api/tickets', {
+      const res = await fetch('https://illustrious-pony-fb2b02.netlify.app/api/tickets', {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
@@ -171,7 +171,7 @@ export default function Dashboard() {
     if (user?.role === 'admin') {
       fetchAllUsers();
     }
-    
+
     const newSocket = io({
       auth: {
         token
@@ -471,9 +471,9 @@ export default function Dashboard() {
   // WebRTC Logic
   const setupMedia = async (type: 'video' | 'voice') => {
     try {
-      const currentStream = await navigator.mediaDevices.getUserMedia({ 
-        video: type === 'video', 
-        audio: true 
+      const currentStream = await navigator.mediaDevices.getUserMedia({
+        video: type === 'video',
+        audio: true
       });
       setStream(currentStream);
       if (myVideo.current) {
@@ -489,7 +489,7 @@ export default function Dashboard() {
   const callUser = async (idToCall: string, type: 'video' | 'voice') => {
     const currentStream = await setupMedia(type);
     if (!currentStream) return;
-    
+
     setCallType(type);
     const peer = new RTCPeerConnection({
       iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
@@ -570,7 +570,7 @@ export default function Dashboard() {
 
     if (callerSignal?.type === 'offer') {
       await peer.setRemoteDescription(new RTCSessionDescription(callerSignal.offer));
-      
+
       pendingCandidates.current.forEach(candidate => {
         peer.addIceCandidate(new RTCIceCandidate(candidate));
       });
@@ -614,19 +614,19 @@ export default function Dashboard() {
 
         {/* Navigation Tabs */}
         <div className="flex border-b border-slate-200">
-          <button 
+          <button
             onClick={() => setActiveTab('chat')}
             className={`flex-1 py-3 text-sm font-medium text-center transition-colors ${activeTab === 'chat' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
           >
             Chat
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab('rooms')}
             className={`flex-1 py-3 text-sm font-medium text-center transition-colors ${activeTab === 'rooms' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
           >
             Rooms
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab('help')}
             className={`flex-1 py-3 text-sm font-medium text-center transition-colors ${activeTab === 'help' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
           >
@@ -636,7 +636,7 @@ export default function Dashboard() {
 
         {user?.role === 'admin' && (
           <div className="p-2 border-b border-slate-200">
-            <button 
+            <button
               onClick={() => setActiveTab('admin')}
               className={`w-full py-2 px-4 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors ${activeTab === 'admin' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
             >
@@ -668,7 +668,7 @@ export default function Dashboard() {
                         </div>
                       </div>
                     </div>
-                    
+
                     {/* Connection Actions */}
                     <div className="mt-2 flex gap-2">
                       {!u.connection_status && (
@@ -706,25 +706,25 @@ export default function Dashboard() {
               <div>
                 <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Create Room</h4>
                 <form onSubmit={handleCreateRoom} className="flex gap-2">
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     value={newRoomName}
                     onChange={(e) => setNewRoomName(e.target.value)}
-                    placeholder="Room Name" 
+                    placeholder="Room Name"
                     className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <button type="submit" className="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">Create</button>
                 </form>
               </div>
-              
+
               <div>
                 <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Join Room</h4>
                 <form onSubmit={handleJoinRoom} className="flex gap-2">
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     value={joinRoomCode}
                     onChange={(e) => setJoinRoomCode(e.target.value)}
-                    placeholder="Room Code" 
+                    placeholder="Room Code"
                     className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase"
                   />
                   <button type="submit" className="bg-green-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-green-700">Join</button>
@@ -739,7 +739,7 @@ export default function Dashboard() {
                   <ul className="space-y-2">
                     {chatrooms.map(room => (
                       <li key={room.id}>
-                        <button 
+                        <button
                           onClick={() => selectRoom(room)}
                           className={`w-full text-left p-3 rounded-xl border transition-colors ${activeRoom?.id === room.id ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-100 hover:bg-slate-50'}`}
                         >
@@ -834,7 +834,7 @@ export default function Dashboard() {
                 </h2>
                 <p className="text-slate-500 mt-1">Manage all user accounts, platform access, and support tickets.</p>
               </div>
-              
+
               <div className="space-y-8">
                 {/* Safety Feature Section */}
                 <div className="bg-blue-50 rounded-xl p-4 border border-blue-100 flex items-start gap-3">
@@ -1015,8 +1015,8 @@ export default function Dashboard() {
                 <form onSubmit={handleCreateTicket} className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Subject</label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       value={ticketSubject}
                       onChange={(e) => setTicketSubject(e.target.value)}
                       required
@@ -1026,7 +1026,7 @@ export default function Dashboard() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Message</label>
-                    <textarea 
+                    <textarea
                       value={ticketMessage}
                       onChange={(e) => setTicketMessage(e.target.value)}
                       required
@@ -1123,12 +1123,12 @@ export default function Dashboard() {
                     </div>
                   )}
                   <form onSubmit={sendMessage} className="flex gap-2 max-w-4xl mx-auto items-center">
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      className="hidden" 
-                      ref={fileInputRef} 
-                      onChange={handleImageSelect} 
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      ref={fileInputRef}
+                      onChange={handleImageSelect}
                     />
                     <button type="button" onClick={() => fileInputRef.current?.click()} className="p-3 text-slate-500 hover:text-blue-600 transition-colors rounded-full hover:bg-slate-100">
                       <ImageIcon className="w-5 h-5" />
@@ -1172,12 +1172,12 @@ export default function Dashboard() {
                       <Music className="w-3 h-3" /> Room Audio
                     </h3>
                     <div className="w-full h-12 rounded overflow-hidden">
-                      <ReactPlayer 
-                        url={activeRoom.music_url} 
-                        playing={true} 
-                        controls={true} 
-                        loop={true} 
-                        width="100%" 
+                      <ReactPlayer
+                        url={activeRoom.music_url}
+                        playing={true}
+                        controls={true}
+                        loop={true}
+                        width="100%"
                         height="100%"
                         config={{
                           youtube: {
@@ -1296,7 +1296,7 @@ export default function Dashboard() {
             <p className="text-slate-500 max-w-md mb-8">
               To start chatting, you need to connect with other users first. Here's how:
             </p>
-            
+
             <div className="grid gap-4 max-w-md w-full text-left">
               <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex gap-4">
                 <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold shrink-0">1</div>
