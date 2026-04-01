@@ -124,7 +124,7 @@ export default function Dashboard() {
 
   const fetchAllUsers = React.useCallback(async () => {
     try {
-      const res = await fetch('https://illustrious-pony-fb2b02.netlify.app/api/admin/users', {
+      const res = await fetch('/api/admin/users', {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
@@ -152,7 +152,7 @@ export default function Dashboard() {
 
   const fetchTickets = React.useCallback(async () => {
     try {
-      const res = await fetch('https://illustrious-pony-fb2b02.netlify.app/api/tickets', {
+      const res = await fetch('/api/tickets', {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
