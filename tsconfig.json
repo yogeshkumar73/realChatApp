@@ -1,11 +1,11 @@
 {
   "compilerOptions": {
-    "target": "ES2015",
+    "target": "ES2020",
     "experimentalDecorators": true,
     "useDefineForClassFields": false,
     "module": "ESNext",
     "lib": [
-      "ES2015",
+      "ES2020",
       "DOM",
       "DOM.Iterable"
     ],
