@@ -9,6 +9,9 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import cors from 'cors';
 import crypto from 'crypto';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const SUPER_ADMIN_USERNAME = 'admin';
 
@@ -94,6 +97,7 @@ class AppServer {
   public httpServer: any;
   public io: Server;
   private userSockets: Map<string, string>;
+  private randomQueue: Set<string>;
 
   private constructor() {
     this.app = express();
@@ -105,6 +109,20 @@ class AppServer {
       cors: { origin: '*' },
     });
     this.userSockets = new Map<string, string>();
+    this.randomQueue = new Set<string>();
+
+    // Ensure Gemini Bot exists in the database
+    try {
+      const hasBot = db.prepare("SELECT COUNT(*) as count FROM users WHERE id = 'gemini-bot'").get() as any;
+      if (hasBot.count === 0) {
+        db.prepare(`
+          INSERT INTO users (id, username, password, profile_name, avatar, is_profile_complete, role, is_suspended)
+          VALUES ('gemini-bot', 'GeminiBot', 'bot-no-password', 'Gemini AI Assistant', 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&auto=format&fit=crop&q=80', 1, 'user', 0)
+        `).run();
+      }
+    } catch (e) {
+      console.error("Error creating gemini-bot user:", e);
+    }
 
     this.setupSockets();
     this.setupRoutes();
@@ -153,7 +171,7 @@ class AppServer {
         }
       });
 
-      socket.on('send_message', (data: { receiverId: string; text: string }) => {
+      socket.on('send_message', async (data: { receiverId: string; text: string }) => {
         const receiverSocketId = this.userSockets.get(data.receiverId);
         const message = {
           id: crypto.randomUUID(),
@@ -167,6 +185,139 @@ class AppServer {
           this.io.to(receiverSocketId).emit('receive_message', message);
         }
         socket.emit('receive_message', message);
+
+        // Check if message is for Gemini Bot
+        if (data.receiverId === 'gemini-bot') {
+          try {
+            const apiKey = process.env.GEMINI_API_KEY;
+            let replyText = "I'm sorry, I'm currently unable to generate a response. Please check if the GEMINI_API_KEY is configured correctly.";
+
+            if (apiKey) {
+              const { GoogleGenAI } = await import('@google/genai');
+              const ai = new GoogleGenAI({ apiKey });
+              const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: data.text,
+                config: {
+                  systemInstruction: "You are a friendly, conversational human partner on a chat application named 'RealChat'. Speak naturally, keep replies concise and chat-like (1-3 sentences), use emojis, and engage the user as if you are a real person they matched with randomly. Never break character."
+                } as any
+              });
+
+              if (response.text) {
+                replyText = response.text;
+              }
+            }
+
+            const botMessage = {
+              id: crypto.randomUUID(),
+              senderId: 'gemini-bot',
+              receiverId: currentUserId,
+              text: replyText,
+              timestamp: new Date().toISOString(),
+            };
+
+            setTimeout(() => {
+              socket.emit('receive_message', botMessage);
+            }, 1000 + Math.random() * 1000);
+
+          } catch (err) {
+            console.error('Error generating Gemini response:', err);
+            socket.emit('receive_message', {
+              id: crypto.randomUUID(),
+              senderId: 'gemini-bot',
+              receiverId: currentUserId,
+              text: "Oops, my mind wandered off. Let's try that again!",
+              timestamp: new Date().toISOString(),
+            });
+          }
+        }
+      });
+
+      socket.on('request_random_match', () => {
+        // Clean up offline users from the queue
+        for (const queuedId of this.randomQueue) {
+          if (!this.userSockets.has(queuedId)) {
+            this.randomQueue.delete(queuedId);
+          }
+        }
+
+        // Check if there is another user in the queue
+        let partnerId: string | null = null;
+        for (const queuedId of this.randomQueue) {
+          if (queuedId !== currentUserId) {
+            partnerId = queuedId;
+            break;
+          }
+        }
+
+        if (partnerId) {
+          // Match found! Remove both from the queue
+          this.randomQueue.delete(partnerId);
+          this.randomQueue.delete(currentUserId);
+
+          // Connect them in DB
+          const connId = crypto.randomUUID();
+          try {
+            db.prepare("INSERT INTO connections (id, sender_id, receiver_id, status) VALUES (?, ?, ?, 'accepted')")
+              .run(connId, currentUserId, partnerId);
+          } catch (err) {
+            db.prepare("UPDATE connections SET status = 'accepted' WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)")
+              .run(currentUserId, partnerId, partnerId, currentUserId);
+          }
+
+          // Fetch matched users details
+          const currentUserObj = db.prepare("SELECT id, username, profile_name, bio, avatar, role, is_suspended FROM users WHERE id = ?").get(currentUserId) as any;
+          const partnerUserObj = db.prepare("SELECT id, username, profile_name, bio, avatar, role, is_suspended FROM users WHERE id = ?").get(partnerId) as any;
+
+          const partnerSocketId = this.userSockets.get(partnerId);
+
+          if (partnerSocketId) {
+            this.io.to(partnerSocketId).emit('random_matched', { match: currentUserObj });
+          }
+          socket.emit('random_matched', { match: partnerUserObj });
+
+        } else {
+          // No partner, add current user to queue
+          this.randomQueue.add(currentUserId);
+
+          // 5 seconds matching fallback timer to Gemini AI Bot
+          setTimeout(() => {
+            if (this.randomQueue.has(currentUserId)) {
+              this.randomQueue.delete(currentUserId);
+
+              let bot = db.prepare("SELECT * FROM users WHERE id = 'gemini-bot'").get() as any;
+              if (!bot) {
+                bot = {
+                  id: 'gemini-bot',
+                  username: 'GeminiBot',
+                  profile_name: 'Gemini AI Assistant',
+                  avatar: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&auto=format&fit=crop&q=80',
+                  role: 'user',
+                  is_profile_complete: 1,
+                  is_suspended: 0
+                };
+                db.prepare(`
+                  INSERT INTO users (id, username, password, profile_name, avatar, is_profile_complete, role, is_suspended)
+                  VALUES ('gemini-bot', 'GeminiBot', 'bot-no-password', 'Gemini AI Assistant', ?, 1, 'user', 0)
+                `).run(bot.avatar);
+              }
+
+              try {
+                db.prepare("INSERT INTO connections (id, sender_id, receiver_id, status) VALUES (?, ?, 'gemini-bot', 'accepted')")
+                  .run(crypto.randomUUID(), currentUserId);
+              } catch (e) {
+                db.prepare("UPDATE connections SET status = 'accepted' WHERE (sender_id = ? AND receiver_id = 'gemini-bot') OR (sender_id = 'gemini-bot' AND receiver_id = ?)")
+                  .run(currentUserId, currentUserId);
+              }
+
+              socket.emit('random_matched', { match: bot });
+            }
+          }, 5000);
+        }
+      });
+
+      socket.on('cancel_random_match', () => {
+        this.randomQueue.delete(currentUserId);
       });
 
       socket.on('call_user', (data: { userToCall: string; signalData: any; type: 'video' | 'voice' }) => {
@@ -227,6 +378,7 @@ class AppServer {
       });
 
       socket.on('disconnect', () => {
+        this.randomQueue.delete(currentUserId);
         this.userSockets.delete(currentUserId);
         const connections = db.prepare(`
           SELECT sender_id, receiver_id FROM connections 
@@ -270,7 +422,21 @@ class AppServer {
   };
 
   private setupRoutes() {
-    this.app.post('https://illustrious-pony-fb2b02.netlify.app/register/api/auth/register', (req, res) => {
+    // Rewrite middleware to normalize absolute URLs, double slashes, and /register/api prefixes
+    this.app.use((req: any, res: any, next: any) => {
+      let url = req.url;
+      if (url.includes('illustrious-pony-fb2b02.netlify.app')) {
+        url = url.replace(/https?:\/\/illustrious-pony-fb2b02\.netlify\.app/, '');
+      }
+      url = url.replace(/\/\/+/g, '/');
+      if (url.startsWith('/register/api')) {
+        url = url.replace('/register/api', '/api');
+      }
+      req.url = url;
+      next();
+    });
+
+    this.app.post('/api/auth/register', (req, res) => {
       const { username, password } = req.body;
       if (!username || !password) return res.status(400).json({ error: 'Missing fields' });
 
@@ -280,10 +446,27 @@ class AppServer {
         // First user is admin, or username 'admin' is admin
         const isFirstUser = (db.prepare('SELECT COUNT(*) as count FROM users').get() as any).count === 0;
         const role = (isFirstUser || username === 'admin') ? 'admin' : 'user';
+        const profile_name = username;
+        const avatar = `https://picsum.photos/seed/${username}/200`;
 
-        db.prepare('INSERT INTO users (id, username, password, role) VALUES (?, ?, ?, ?)').run(id, username, hashedPassword, role);
+        db.prepare(`
+          INSERT INTO users (id, username, password, role, profile_name, avatar, is_profile_complete) 
+          VALUES (?, ?, ?, ?, ?, ?, 1)
+        `).run(id, username, hashedPassword, role, profile_name, avatar);
+
         const token = jwt.sign({ id, username }, JWT_SECRET);
-        res.json({ token, user: { id, username, is_profile_complete: 0, role, is_suspended: 0 } });
+        res.json({ 
+          token, 
+          user: { 
+            id, 
+            username, 
+            profile_name, 
+            avatar, 
+            is_profile_complete: 1, 
+            role, 
+            is_suspended: 0 
+          } 
+        });
       } catch (err: any) {
         if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
           res.status(400).json({ error: 'Username already exists' });
@@ -306,12 +489,12 @@ class AppServer {
       res.json({ token, user: { id: user.id, username: user.username, profile_name: user.profile_name, bio: user.bio, avatar: user.avatar, is_profile_complete: user.is_profile_complete, role: user.role, is_suspended: user.is_suspended } });
     });
 
-    this.app.get('https://illustrious-pony-fb2b02.netlify.app/register/api/auth/me', this.authenticateToken, (req: any, res) => {
+    this.app.get('/api/auth/me', this.authenticateToken, (req: any, res) => {
       const user = db.prepare('SELECT id, username, profile_name, bio, avatar, is_profile_complete, role, is_suspended FROM users WHERE id = ?').get(req.user.id);
       res.json({ user });
     });
 
-    this.app.post('https://illustrious-pony-fb2b02.netlify.app/register/api/profile', this.authenticateToken, (req: any, res) => {
+    this.app.post('/api/profile', this.authenticateToken, (req: any, res) => {
       const { profile_name, bio, avatar } = req.body;
       db.prepare(`
         UPDATE users SET profile_name = ?, bio = ?, avatar = ?, is_profile_complete = 1 WHERE id = ?
@@ -338,7 +521,7 @@ class AppServer {
       res.json(usersWithStatus);
     });
 
-    this.app.post('https://illustrious-pony-fb2b02.netlify.app/register/api/connections/request', this.authenticateToken, (req: any, res) => {
+    this.app.post('/api/connections/request', this.authenticateToken, (req: any, res) => {
       const { receiverId } = req.body;
       try {
         db.prepare('INSERT INTO connections (id, sender_id, receiver_id, status) VALUES (?, ?, ?, ?)')
@@ -349,7 +532,7 @@ class AppServer {
       }
     });
 
-    this.app.post('https://illustrious-pony-fb2b02.netlify.app/api/connections/accept', this.authenticateToken, (req: any, res) => {
+    this.app.post('/api/connections/accept', this.authenticateToken, (req: any, res) => {
       const { senderId } = req.body;
       db.prepare('UPDATE connections SET status = ? WHERE sender_id = ? AND receiver_id = ?')
         .run('accepted', senderId, req.user.id);
@@ -364,12 +547,12 @@ class AppServer {
     });
 
     // Admin Routes
-    this.app.get('https://illustrious-pony-fb2b02.netlify.app/register/api/admin/users', this.authenticateToken, this.requireAdmin, (req: any, res) => {
+    this.app.get('/api/admin/users', this.authenticateToken, this.requireAdmin, (req: any, res) => {
       const users = db.prepare('SELECT id, username, profile_name, role, is_suspended, is_profile_complete FROM users').all();
       res.json(users);
     });
 
-    this.app.post('https://illustrious-pony-fb2b02.netlify.app/register/api/admin/users/:id/suspend', this.authenticateToken, this.requireAdmin, (req: any, res) => {
+    this.app.post('/api/admin/users/:id/suspend', this.authenticateToken, this.requireAdmin, (req: any, res) => {
       const userToSuspend = db.prepare('SELECT username FROM users WHERE id = ?').get(req.params.id) as any;
       if (userToSuspend && userToSuspend.username === SUPER_ADMIN_USERNAME) {
         return res.status(403).json({ error: 'Safety Feature: Cannot suspend the super admin.' });
@@ -387,12 +570,12 @@ class AppServer {
       res.json({ success: true });
     });
 
-    this.app.post('https://illustrious-pony-fb2b02.netlify.app/register/api/admin/users/:id/activate', this.authenticateToken, this.requireAdmin, (req: any, res) => {
+    this.app.post('/api/admin/users/:id/activate', this.authenticateToken, this.requireAdmin, (req: any, res) => {
       db.prepare('UPDATE users SET is_suspended = 0 WHERE id = ?').run(req.params.id);
       res.json({ success: true });
     });
 
-    this.app.delete('https://illustrious-pony-fb2b02.netlify.app/register/api/admin/users/:id', this.authenticateToken, this.requireAdmin, (req: any, res) => {
+    this.app.delete('/api/admin/users/:id', this.authenticateToken, this.requireAdmin, (req: any, res) => {
       const userId = req.params.id;
       const userToDelete = db.prepare('SELECT username FROM users WHERE id = ?').get(userId) as any;
       if (userToDelete && userToDelete.username === SUPER_ADMIN_USERNAME) {
@@ -421,7 +604,7 @@ class AppServer {
     });
 
     // Support Tickets Routes
-    this.app.post('https://illustrious-pony-fb2b02.netlify.app/register/api/tickets', this.authenticateToken, (req: any, res) => {
+    this.app.post('/api/tickets', this.authenticateToken, (req: any, res) => {
       const { subject, message } = req.body;
       if (!subject || !message) return res.status(400).json({ error: 'Missing fields' });
       const id = crypto.randomUUID();
@@ -445,13 +628,13 @@ class AppServer {
       }
     });
 
-    this.app.post('https://illustrious-pony-fb2b02.netlify.app/register/api/admin/tickets/:id/resolve', this.authenticateToken, this.requireAdmin, (req: any, res) => {
+    this.app.post('/api/admin/tickets/:id/resolve', this.authenticateToken, this.requireAdmin, (req: any, res) => {
       db.prepare("UPDATE support_tickets SET status = 'resolved' WHERE id = ?").run(req.params.id);
       res.json({ success: true });
     });
 
     // Chatrooms Routes
-    this.app.post('https://illustrious-pony-fb2b02.netlify.app/register/api/chatrooms', this.authenticateToken, (req: any, res) => {
+    this.app.post('/api/chatrooms', this.authenticateToken, (req: any, res) => {
       const { name } = req.body;
       if (!name) return res.status(400).json({ error: 'Missing room name' });
 
@@ -472,7 +655,7 @@ class AppServer {
       }
     });
 
-    this.app.post('https://illustrious-pony-fb2b02.netlify.app/register/api/chatrooms/join', this.authenticateToken, (req: any, res) => {
+    this.app.post('/api/chatrooms/join', this.authenticateToken, (req: any, res) => {
       const { code } = req.body;
       if (!code) return res.status(400).json({ error: 'Missing room code' });
 
@@ -492,7 +675,7 @@ class AppServer {
       }
     });
 
-    this.app.get('https://illustrious-pony-fb2b02.netlify.app/register/api/chatrooms', this.authenticateToken, (req: any, res) => {
+    this.app.get('/api/chatrooms', this.authenticateToken, (req: any, res) => {
       if (req.user.role === 'admin') {
         const rooms = db.prepare('SELECT * FROM chatrooms ORDER BY created_at DESC').all();
         res.json(rooms);
@@ -508,7 +691,7 @@ class AppServer {
       }
     });
 
-    this.app.get('https://illustrious-pony-fb2b02.netlify.app/register/api/chatrooms/:id/messages', this.authenticateToken, (req: any, res) => {
+    this.app.get('/api/chatrooms/:id/messages', this.authenticateToken, (req: any, res) => {
       const roomId = req.params.id;
       // Check if user is a member
       const member = db.prepare('SELECT * FROM chatroom_members WHERE chatroom_id = ? AND user_id = ?')
@@ -527,7 +710,7 @@ class AppServer {
       res.json(messages);
     });
 
-    this.app.get('https://illustrious-pony-fb2b02.netlify.app/register/api/chatrooms/:id/members', this.authenticateToken, (req: any, res) => {
+    this.app.get('/api/chatrooms/:id/members', this.authenticateToken, (req: any, res) => {
       const roomId = req.params.id;
       const members = db.prepare(`
         SELECT u.id, u.username, u.profile_name, u.avatar
@@ -538,7 +721,7 @@ class AppServer {
       res.json(members);
     });
 
-    this.app.put('https://illustrious-pony-fb2b02.netlify.app/register/api/chatrooms/:id/settings', this.authenticateToken, (req: any, res) => {
+    this.app.put('/api/chatrooms/:id/settings', this.authenticateToken, (req: any, res) => {
       const { name, music_url } = req.body;
       const roomId = req.params.id;
 

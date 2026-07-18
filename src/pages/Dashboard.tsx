@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { Send, Users, LogOut, Phone, Video, UserPlus, Check, X, MessageSquare, Shield, ShieldAlert, Settings, Image as ImageIcon, Music, Paperclip } from 'lucide-react';
 import { format } from 'date-fns';
 import ReactPlayer from 'react-player';
+const Player = ReactPlayer as any;
 
 type AppUser = {
   id: string;
@@ -110,7 +111,7 @@ export default function Dashboard() {
 
   const fetchUsers = React.useCallback(async () => {
     try {
-      const res = await fetch('https://illustrious-pony-fb2b02.netlify.app/register/api/users', {
+      const res = await fetch('/api/users', {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
@@ -124,7 +125,7 @@ export default function Dashboard() {
 
   const fetchAllUsers = React.useCallback(async () => {
     try {
-      const res = await fetch('https://illustrious-pony-fb2b02.netlify.app/register/api/admin/users', {
+      const res = await fetch('/api/admin/users', {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
@@ -152,7 +153,7 @@ export default function Dashboard() {
 
   const fetchTickets = React.useCallback(async () => {
     try {
-      const res = await fetch('https://illustrious-pony-fb2b02.netlify.app/register/api/tickets', {
+      const res = await fetch('/api/tickets', {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
@@ -240,7 +241,7 @@ export default function Dashboard() {
   const handleSuspend = async (id: string, isSuspended: number) => {
     try {
       const endpoint = isSuspended ? 'activate' : 'suspend';
-      const res = await fetch(`https://illustrious-pony-fb2b02.netlify.app/register/api/admin/users/${id}/${endpoint}`, {
+      const res = await fetch(`/api/admin/users/${id}/${endpoint}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -290,7 +291,7 @@ export default function Dashboard() {
 
   const handleConnect = async (receiverId: string) => {
     try {
-      await fetch('https://illustrious-pony-fb2b02.netlify.app/register/api/connections/request', {
+      await fetch('/api/connections/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ receiverId })
@@ -303,7 +304,7 @@ export default function Dashboard() {
 
   const handleAccept = async (senderId: string) => {
     try {
-      await fetch('https://illustrious-pony-fb2b02.netlify.app/register/api/connections/accept', {
+      await fetch('/api/connections/accept', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ senderId })
@@ -316,7 +317,7 @@ export default function Dashboard() {
 
   const handleReject = async (senderId: string) => {
     try {
-      await fetch('https://illustrious-pony-fb2b02.netlify.app/register/api/connections/reject', {
+      await fetch('/api/connections/reject', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ senderId })
@@ -340,7 +341,7 @@ export default function Dashboard() {
     e.preventDefault();
     if (!activeRoom) return;
     try {
-      const res = await fetch(`https://illustrious-pony-fb2b02.netlify.app/register/api/chatrooms/${activeRoom.id}/settings`, {
+      const res = await fetch(`/api/chatrooms/${activeRoom.id}/settings`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ name: editRoomName, music_url: editMusicUrl })
@@ -369,7 +370,7 @@ export default function Dashboard() {
     e.preventDefault();
     if (!newRoomName.trim()) return;
     try {
-      const res = await fetch('https://illustrious-pony-fb2b02.netlify.app/register/api/chatrooms', {
+      const res = await fetch('/api/chatrooms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ name: newRoomName.trim() })
@@ -391,7 +392,7 @@ export default function Dashboard() {
     e.preventDefault();
     if (!joinRoomCode.trim()) return;
     try {
-      const res = await fetch('https://illustrious-pony-fb2b02.netlify.app/register/api/chatrooms/join', {
+      const res = await fetch('/api/chatrooms/join', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ code: joinRoomCode.trim() })
@@ -413,7 +414,7 @@ export default function Dashboard() {
     e.preventDefault();
     if (!ticketSubject.trim() || !ticketMessage.trim()) return;
     try {
-      const res = await fetch('https://illustrious-pony-fb2b02.netlify.app/register/api/tickets', {
+      const res = await fetch('/api/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ subject: ticketSubject.trim(), message: ticketMessage.trim() })
@@ -430,7 +431,7 @@ export default function Dashboard() {
 
   const handleResolveTicket = async (id: string) => {
     try {
-      await fetch(`https://illustrious-pony-fb2b02.netlify.app/api/admin/tickets/${id}/resolve`, {
+      await fetch(`/api/admin/tickets/${id}/resolve`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -449,14 +450,14 @@ export default function Dashboard() {
       socket.emit('join_room', room.id);
     }
     try {
-      const res = await fetch(`https://illustrious-pony-fb2b02.netlify.app/api/chatrooms/${room.id}/messages`, {
+      const res = await fetch(`/api/chatrooms/${room.id}/messages`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
         const data = await res.json();
         setRoomMessages(prev => ({ ...prev, [room.id]: data }));
       }
-      const membersRes = await fetch(`https://illustrious-pony-fb2b02.netlify.app/api/chatrooms/${room.id}/members`, {
+      const membersRes = await fetch(`/api/chatrooms/${room.id}/members`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (membersRes.ok) {
@@ -1172,7 +1173,7 @@ export default function Dashboard() {
                       <Music className="w-3 h-3" /> Room Audio
                     </h3>
                     <div className="w-full h-12 rounded overflow-hidden">
-                      <ReactPlayer
+                      <Player
                         url={activeRoom.music_url}
                         playing={true}
                         controls={true}
@@ -1183,7 +1184,7 @@ export default function Dashboard() {
                           youtube: {
                             playerVars: { showinfo: 1 }
                           }
-                        }}
+                        } as any}
                       />
                     </div>
                   </div>

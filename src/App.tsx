@@ -7,9 +7,8 @@ import ProfileSetup from './pages/ProfileSetup';
 import Dashboard from './pages/Dashboard';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, token } = useAuth();
+  const { token } = useAuth();
   if (!token) return <Navigate to="/login" />;
-  if (user && !user.is_profile_complete) return <Navigate to="/profile-setup" />;
   return <>{children}</>;
 };
 
@@ -17,8 +16,8 @@ const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/profile-setup" element={<ProfileSetup />} />
+      <Route path="/register" element={<Navigate to="/login" replace />} />
+      <Route path="/profile-setup" element={<Navigate to="/" replace />} />
       <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
     </Routes>
   );
